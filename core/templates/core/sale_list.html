@@ -1,0 +1,253 @@
+{% extends 'core/base.html' %}
+{% load humanize %}
+{% block content %}
+
+<h2 class="user-name">{% if request.user.first_name %}{{ request.user.first_name }}'s Sales{% else %}Your Sales{% endif %}</h2>
+
+<div class="add-and-manage-sales">
+    <a href="{% url 'sale_new' %}" class="btn btn-primary">Add New Sale</a>
+    <a href="{% url 'manage_sales' %}" class="btn btn-primary">Manage Sales</a>
+</div>
+
+{% if map_sales %}
+<h3 class="page-title">Sales Locations</h3>
+<h5 class="num-of-pins">{{ map_sales.count }} sales with coordinates</h5>
+<div class="d-flex justify-content-center align-items-center mb-3">
+    {% if request.GET.city or request.GET.zip_code %}
+    <h5>Showing sales for:
+        {% if request.GET.city %} {{ request.GET.city }}{% if request.GET.zip_code %}, {% endif %}{% endif %}
+        {% if request.GET.zip_code %}Zip Code {{ request.GET.zip_code }}{% endif %} area
+    </h5>
+    {% endif %}
+</div>
+<!--<div class="mb-3 text-end">
+    <a href="{% url 'manage_sales' %}" class="btn btn-primary">Manage Sales</a>
+</div>-->
+
+<div id="map" class="map-container" style="height: 400px; width: 100%;"></div>
+<script>
+    console.log('Template loaded. map_sales count: {{ map_sales.count }}');
+    function initMap() {
+        console.log('Starting initMap');
+        try {
+            if (!window.google || !window.google.maps) {
+                console.error('Google Maps API not loaded');
+                alert('Failed to load map. Check internet or API key.');
+                return;
+            }
+            const map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 8,
+                center: {lat: {{ map_sales.0.latitude|default:44.9537|floatformat:6 }}, lng: {{ map_sales.0.longitude|default:-93.0900|floatformat:6 }}}
+            });
+            console.log('Map initialized successfully');
+            const bounds = new google.maps.LatLngBounds();
+            const markers = [
+                {% for sale in map_sales %}
+                {% if sale.latitude and sale.longitude %}
+                {
+                    lat: {{ sale.latitude|floatformat:6 }},
+                    lng: {{ sale.longitude|floatformat:6 }},
+                    title: '{{ sale.job_number|escapejs }} - {{ sale.name|escapejs }}',
+                    info: '<div style="max-width: 200px;"><strong>{{ sale.job_number|escapejs }} - {{ sale.name|escapejs }}</strong><br>Sale Date: {{ sale.sale_date|date:"M d, Y" }}<br>Address: {{ sale.street|escapejs }}, {{ sale.city|escapejs }}, {{ sale.state|escapejs }} {{ sale.zip_code|escapejs }}{% if sale.phone_number %}<br>Phone: {{ sale.phone_number|escapejs }}{% endif %}<br>Products: {{ sale.products_sold|default:"N/A"|escapejs }}</div>'
+                },
+                {% else %}
+                console.warn('Sale {{ sale.job_number|escapejs }} has no valid latitude/longitude');
+                {% endif %}
+                {% endfor %}
+            ];
+            console.log('Markers array length:', markers.length);
+            markers.forEach(marker => {
+                console.log('Adding marker:', marker.title, 'at', marker.lat, marker.lng);
+                try {
+                    const position = {lat: marker.lat, lng: marker.lng};
+                    const googleMarker = new google.maps.Marker({
+                        position: position,
+                        map: map,
+                        title: marker.title,
+                        icon: {
+                            url: '/static/images/MapPin_02.png',
+                            scaledSize: new google.maps.Size(32, 32)
+                        }
+                    });
+                    const infoWindow = new google.maps.InfoWindow({
+                        content: marker.info
+                    });
+                    googleMarker.addListener('click', () => {
+                        console.log('Marker clicked:', marker.title);
+                        infoWindow.open(map, googleMarker);
+                    });
+                    bounds.extend(position);
+                } catch (markerError) {
+                    console.error('Error creating marker:', marker.title, markerError);
+                }
+            });
+            const searchZipCode = '{{ search_zip_code|escapejs }}';
+            const searchCity = '{{ search_city|escapejs }}';
+            const geocoder = new google.maps.Geocoder();
+            if (searchZipCode) {
+                geocoder.geocode({ address: searchZipCode + ', USA' }, (results, status) => {
+                    if (status === google.maps.GeocoderStatus.OK && results[0]) {
+                        const location = results[0].geometry.location;
+                        map.setCenter(location);
+                        map.setZoom(12); // Closer zoom for zip code
+                        console.log('Geocoded zip code:', searchZipCode, 'to', location.lat(), location.lng());
+                    } else {
+                        console.warn('Geocode failed for zip code:', searchZipCode, 'Status:', status);
+                        if (searchCity) {
+                            geocoder.geocode({ address: searchCity + ', USA' }, (cityResults, cityStatus) => {
+                                if (cityStatus === google.maps.GeocoderStatus.OK && cityResults[0]) {
+                                    const cityLocation = cityResults[0].geometry.location;
+                                    map.setCenter(cityLocation);
+                                    map.setZoom(10); // Wider zoom for city
+                                    console.log('Geocoded city:', searchCity, 'to', cityLocation.lat(), cityLocation.lng());
+                                } else {
+                                    console.warn('Geocode failed for city:', searchCity, 'Status:', cityStatus);
+                                    if (markers.length > 0) {
+                                        map.fitBounds(bounds);
+                                    }
+                                }
+                            });
+                        } else if (markers.length > 0) {
+                            map.fitBounds(bounds);
+                        }
+                    }
+                });
+            } else if (searchCity) {
+                geocoder.geocode({ address: searchCity + ', USA' }, (results, status) => {
+                    if (status === google.maps.GeocoderStatus.OK && results[0]) {
+                        const location = results[0].geometry.location;
+                        map.setCenter(location);
+                        map.setZoom(12); // Wider zoom for city
+                        console.log('Geocoded city:', searchCity, 'to', location.lat(), location.lng());
+                    } else {
+                        console.warn('Geocode failed for city:', searchCity, 'Status:', status);
+                        if (markers.length > 0) {
+                            map.fitBounds(bounds);
+                        }
+                    }
+                });
+            } else if (markers.length > 0) {
+                console.log('Fitting map to bounds');
+                map.fitBounds(bounds);
+            } else {
+                console.warn('No markers to display');
+            }
+        } catch (error) {
+            console.error('initMap error:', error);
+            alert('Map initialization failed: ' + error.message);
+        }
+    }
+</script>
+<script async src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places,geocoding&callback=initMap"></script>  <!--Updated -->
+
+{% else %}
+<p>No sales with valid coordinates to display on the map.</p>
+{% endif %}
+<form method="get" class="row g-3 mb-4">
+    <div class="col-auto">
+        <input type="text" name="city" class="form-control" placeholder="Search by City, State" value="{{ request.GET.city }}">
+    </div>
+    <div class="col-auto">
+        <input type="text" name="zip_code" class="form-control" placeholder="Search by Zip Code" value="{{ request.GET.zip_code }}">
+    </div>
+    <div class="col-auto  sales-list-filter">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="{% url 'sale_list' %}" class="btn btn-outline-secondary">Clear</a>
+    </div>
+</form>
+<!-- ************ Changed to COLUMN Style View ************ -->
+<ul class="list-group mb-4" id="sales-list">
+{% for sale in sales %}
+    <li class="list-group-item">
+        <span id="job_number">{{ sale.job_number }}</span>
+        <span>{{ sale.name }}</span>
+    </li>
+    <li class="list-group-item">   
+        <span>Date:</span> 
+        <span>{{ sale.sale_date|date:"M d, Y" }}</span>
+    </li>
+    <li class="list-group-item">    
+        <span>Address:</span> 
+        <span>{{ sale.street }}, {{ sale.city }}, {{ sale.state }} {{ sale.zip_code }}</span>
+    </li>    
+    <li class="list-group-item">
+        <span>Phone:</span> 
+        <span>{{ sale.phone_number }}</span>
+    </li>
+    <li class="list-group-item">
+        <span>Sale Amount:</span> 
+        <span>${{ sale.amount|intcomma }} {% if sale.commission %}| <strong>Commission:</strong> ${{ sale.commission|intcomma }}{% endif %}</span>
+    </li>
+    <li class="list-group-item">
+        <span>Products Sold:</span> 
+        <span>{{ sale.products_sold }}</span>
+    </li>    
+    <li class="list-group-item">
+        <span>Notes:</span> 
+        <span>{{ sale.notes|wordwrap:60|linebreaksbr }}</span>
+    </li>    
+    <li class="list-group-item">
+        <span>
+            <a href="{% url 'sale_edit' sale.pk %}" class="btn btn-sm btn-warning">Edit</a>
+            <a href="{% url 'sale_delete' sale.pk %}" class="btn btn-sm btn-danger">Delete</a>
+        </span>
+    </li>
+    <li class="list-group-item">
+        <p class="bottom_border"></p>
+    </li>
+{% empty %}
+    <li class="list-group-item">No sales yet. <a href="{% url 'sale_new' %}">Add one!</a></li>
+{% endfor %}
+</ul>
+
+<!-- ********** Previous Version of LISTED SALES **********-->
+ <!--<ul class="list-group mb-4" id="sales-list">
+{% for sale in sales %}
+    <li class="list-group-item">
+        <strong>{{ sale.job_number }}</strong> - {{ sale.name }} <br>
+        <strong style="color: #5118ac;">Date:</strong> {{ sale.sale_date|date:"M d, Y" }}<br>
+        <strong style="color: #5118ac;">Address:</strong> {{ sale.street }}, {{ sale.city }}, {{ sale.state }} {{ sale.zip_code }}<br>
+        {% if sale.phone_number %}<strong style="color: #5118ac;">Phone:</strong> {{ sale.phone_number }}<br>{% endif %}
+        <strong style="color: #5118ac;">Sale Amount:</strong> ${{ sale.amount }} {% if sale.commission %}| Commission: ${{ sale.commission }}{% endif %}<br>
+        <strong style="color: #5118ac;">Products Sold:</strong> {{ sale.products_sold }}<br>
+        <strong style="color: #5118ac;">Notes:</strong> {{ sale.notes|linebreaks }}
+        <a href="{% url 'sale_edit' sale.pk %}" class="btn btn-sm btn-warning">Edit</a>
+        <a href="{% url 'sale_delete' sale.pk %}" class="btn btn-sm btn-danger">Delete</a>
+    </li>
+{% empty %}
+    <li class="list-group-item">No sales yet. <a href="{% url 'sale_new' %}">Add one!</a></li>
+{% endfor %}
+</ul>-->
+
+{% if page_obj.has_next %}
+<div class="text-center">
+    <button id="load-more" class="btn btn-primary" data-next-page="{{ page_obj.next_page_number }}">Load More</button>
+</div>
+{% endif %}
+<script>
+document.getElementById('load-more')?.addEventListener('click', function() {
+    const button = this;
+    const nextPage = button.getAttribute('data-next-page');
+    const city = '{{ request.GET.city|default:"" }}';
+    const zipCode = '{{ request.GET.zip_code|default:"" }}';
+    
+    fetch(`/sales/load-more/?page=${nextPage}&city=${encodeURIComponent(city)}&zip_code=${encodeURIComponent(zipCode)}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.sales_html) {
+            document.getElementById('sales-list').innerHTML += data.sales_html;
+        }
+        if (data.has_next) {
+            button.setAttribute('data-next-page', data.next_page);
+        } else {
+            button.remove();
+        }
+    })
+    .catch(error => console.error('Error:', error));
+});
+</script>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends 'core/base.html' %}
+{% block content %}
+
+<div class="delete_confirm_body">
+    <div class="delete_confirm">
+        <h2>
+            <i class="fa-solid fa-trash-can"></i> Delete Sale
+        </h2>
+        <p class="delete_question">Are you sure you want to delete:</p>
+        <p>{{ sale.job_number }} <br> {{ sale.name }}?</p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn confirm-delete">Delete</button>
+            <a href="{% url redirect_url|default:'sale_list' %}" class="btn cxl-secondary">Cancel</a>
+            <!--<a href="{% url 'sale_list' %}" class="btn btn-secondary">Cancel</a>  ** Original HTML** -->
+        </form>
+    </div>
+</div>
+{% endblock %}

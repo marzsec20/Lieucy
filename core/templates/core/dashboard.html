@@ -1,0 +1,180 @@
+{% extends 'core/base.html' %}
+{% load humanize %}
+{% block content %}
+
+<h2 class="page-title">Dashboard</h2>
+<div class="mb-3">
+    <div class="col-md-6 offset-md-6 text-md-end">
+        <h3 class="page-title">Total Career Sales: ${{ total_career_sales|floatformat:2|intcomma }}</h3>
+    </div>
+</div>
+
+<!-- Filters -->
+<form method="get" class="mb-3 filter-text">
+    <div class="row">
+        <div class="col-md-3">
+            <label for="start_date">Start Date</label>
+            <input type="date" name="start_date" id="start_date" value="{{ start_date }}" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label for="end_date">End Date</label>
+            <input type="date" name="end_date" id="end_date" value="{{ end_date }}" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label for="year">Year</label>
+            <select name="year" id="year" class="form-control">
+                <option value="">All Years</option>
+                {% for year in years %}
+                    <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="city">City</label>
+            <input type="text" name="city" id="city" value="{{ city }}" class="form-control" placeholder="e.g., Saint Paul">
+        </div>
+    </div>
+    <div class="dashboard-filter">
+        <button type="submit" class="btn btn-primary">Apply Filters</button>
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Clear Filters</a>
+    </div>
+</form>
+
+
+<div class="chart-container">
+    <!-- Month Chart -->
+    <div class="mb-5">
+        <h4 class="chart-title">Sales by Month ({{ selected_year }})</h4>
+        <canvas id="monthChart"></canvas>
+    </div>
+
+    <!-- City Chart -->
+    <div class="mb-5">
+        <h4 class="chart-title">Sales by City</h4>
+        <canvas id="cityChart"></canvas>
+    </div>
+
+    <!-- Date Chart -->
+    <div class="mb-5">
+        <h4 class="chart-title">Sales by Date</h4>
+        <canvas id="dateChart"></canvas>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Date Chart
+    new Chart(document.getElementById('dateChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ date_chart_data.labels|safe }},
+            datasets: [{
+                label: 'Total Accountability Amount',
+                data: {{ date_chart_data.data|safe }},
+                borderColor: 'blue',
+                backgroundColor: 'green',
+                fill: false
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Accountability Amount'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                }
+            }
+        }
+    });
+
+    // Month Chart
+    new Chart(document.getElementById('monthChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ month_chart_data.labels|safe }},
+            datasets: [
+                {
+                    label: 'Number of Sales',
+                    data: {{ month_chart_data.count_data|safe }},
+                    backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Total Accountability Amount',
+                    data: {{ month_chart_data.amount_data|safe }},
+                    type: 'line',
+                    borderColor: 'red',
+                    tension: 0.4,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Sales'
+                    }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Accountability Amount'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Month'
+                    }
+                }
+            }
+        }
+    });
+
+    // City Chart
+    new Chart(document.getElementById('cityChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ city_chart_data.labels|safe }},
+            datasets: [{
+                label: 'Total Accountability Amount',
+                data: {{ city_chart_data.data|safe }},
+                backgroundColor: 'rgba(153, 102, 255, 0.5)'
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Accountability Amount'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'City'
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

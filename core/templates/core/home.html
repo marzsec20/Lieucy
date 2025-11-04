@@ -1,0 +1,8 @@
+{% extends 'core/base.html' %}  
+{% block content %}
+<h1>Sales Tracker</h1>
+<p>
+    <a href="{% url 'sale_new' %}" class="btn btn-primary">Add New Sale</a>
+    <a href="{% url 'sale_list' %}" class="btn btn-secondary">View Your Sales</a>
+</p>
+{% endblock %}
