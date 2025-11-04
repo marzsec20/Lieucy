@@ -1,0 +1,2 @@
+# Lieucy
+Sales Tracking app
