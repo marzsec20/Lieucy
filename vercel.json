@@ -9,5 +9,14 @@
             "src": "/(.*)",
             "dest": "salesapp/wsgi.py"
         }
-    ]
+    ],
+    "functions": {
+    "app/api/**/*.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "env": {
+    "MY_API_KEY": "your-key"
+  }
 }
+
